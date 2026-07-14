@@ -102,7 +102,6 @@ MyMoThErWoUlDnTaDoPtMe/
 │   ├── KeyboardShortcutsHandler.swift
 │   └── ... (search, playlists, artwork, empty states)
 ├── Resources/
-│   ├── 3LF5bEk.mp4                   default background video
 │   └── AppIcon.icns                  app icon
 └── Assets.xcassets/                  icon assets
 ```
