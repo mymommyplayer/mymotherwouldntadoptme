@@ -4,94 +4,140 @@
 [![macOS](https://img.shields.io/badge/macOS-14.0+-blue.svg)](https://www.apple.com/macos/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 
-A macOS music player that plays a single video or GIF loop behind entire playlists—import from YouTube or SoundCloud, set a background, and let it run.
+A macOS music player. Paste a YouTube or SoundCloud playlist URL, set a looping video background, and play. Discovery mode finds similar tracks automatically when each one ends.
 
 Inspired by [nuclearplayer.com](https://nuclearplayer.com) and the visual style of [のろヰ](https://lit.link/en/rnatataki) and [@mentaldisorders_](https://www.youtube.com/@mentaldisorders_).
 
 ![Demo]((_-_).gif)
 
-## What it does
+## Features
 
-- Import playlists from YouTube or SoundCloud
-- Play them with a single background video or GIF behind all the tracks
-- Manage playback (shuffle, repeat modes), favorites, queue
-- Adjust volume, see now-playing info in the Control Center
-- Discovery mode: auto-play similar tracks (via Last.fm) when one finishes
+- **Dual-source search** — YouTube and SoundCloud results merged into one list
+- **Background video** — loop a video, GIF, or image behind all tracks. Each playlist can have its own background.
+- **Discovery** — when a track ends, queries Last.fm for similar tracks, picks one weighted by match strength, and queues it
+- **Queue** — drag-reorder, persistent across launches, play-next insertion
+- **Import** — paste a YouTube/SoundCloud playlist URL, fetches all tracks automatically
+- **Crossfade** — configurable crossfade between tracks (0.5–10s)
+- **Control Center** — reports track info, artwork, and remote commands to macOS
+- **Keyboard shortcuts** — Space, arrows, S/R/L, Cmd+F
 
-## Building and running 
+## Building
 
-Requires Swift 5.9, macOS 14.0 or later.
+Requires Xcode 15+, macOS 14.0+.
 
 ```bash
 git clone https://github.com/mymommyplayer/mymotherwouldntadoptme.git
 cd mymotherwouldntadoptme
-chmod +x run.sh
-./run.sh
 ```
 
-## Tests
+1. Open `MyMoThErWoUlDnTaDoPtMe.xcodeproj` in Xcode
+2. Select the `MyMoThErWoUlDnTaDoPtMe` scheme
+3. Build and run (Cmd+R)
 
-```bash
-swift test
+
+### API keys
+
+Last.fm and SoundCloud require API keys. Create `Config.xcconfig` in the project root:
+
+```
+LASTFM_API_KEY=your_key_here
+SOUNDCLOUD_CLIENT_ID=your_id_here
 ```
 
-Tests cover YouTube and SoundCloud URL parsing (various formats, edge cases), CoreData operations (adding/removing tracks, index ordering).
+Get a Last.fm key at https://www.last.fm/api/account/create. SoundCloud client ID requires a registered app at https://soundcloud.com/you/apps.
 
-## How it works 
-
-**ContentView** owns the main UI. It delegates to:
-
-- **AudioPlayer**: handles playback
-- **QueueManager**: track ordering and queue state
-- **PlaylistImportService**: fetch and parse YouTube/SoundCloud URLs, create playlists in CoreData
-- **YouTubeProvider** / **SoundCloudProvider**: network calls and response parsing
-- **BackgroundManager**: video/GIF rendering
-- **DiscoveryManager**: queries Last.fm for similar tracks, auto-queues them when current track ends
-- **FavoritesManager**, **NowPlayingManager**: state for favorites and Control Center display
-
-Data lives in CoreData: **PlaylistEntity** (the playlist itself) and **PlaylistTrackEntity** (individual tracks, stored with index order).
-
-The import flow: user pastes a URL → service extracts the playlist ID → provider fetches track list → tracks get stored locally → they play against the user's chosen background.
-
-Discovery mode: when a track finishes, DiscoveryManager asks Last.fm for similar tracks, picks one weighted by match strength, searches YouTube/SoundCloud for it, resolves the stream, and queues it. A[...]
+Without these keys, streaming still works but Last.fm discovery and SoundCloud playlists will fail.
 
 ## Project structure
 
 ```
-Sources/MyMoThErWoUlDnTaDoPtMe/
-├── ContentView.swift
+MyMoThErWoUlDnTaDoPtMe/
+├── App.swift                         @main entry point
+├── ContentView.swift                 root view
+├── WindowManager.swift               window config
+├── SearchResult.swift                track model
+├── SourceProvider.swift              provider protocol
+├── YouTubeProvider.swift             YouTube search/stream via yt-dlp
+├── SoundCloudProvider.swift          SoundCloud search/stream via yt-dlp
 ├── Core/
-│   └── AppContainer.swift
+│   ├── AppContainer.swift            dependency injection
+│   ├── BackgroundManager.swift       video/GIF/image backgrounds
+│   ├── BackgroundMode.swift          background mode enum
+│   ├── SecretsLoader.swift           reads Config.xcconfig
+│   └── LastFMAPIKey.swift            loads Last.fm key
+├── CoreData/
+│   ├── PersistenceController.swift   CoreData stack
+│   ├── PlaylistEntity.swift          playlist model
+│   └── PlaylistTrackEntity.swift     track model
+├── Discovery/
+│   ├── DiscoveryManager.swift        auto-discovery via Last.fm
+│   ├── LastFMService.swift           Last.fm API calls
+│   └── SimilarTrack.swift            response models
+├── Networking/
+│   └── NetworkClient.swift           URLSession wrapper
+├── Player/
+│   ├── AudioPlayer.swift             AVPlayer playback + crossfade
+│   ├── PlayerState.swift             playback state enum
+│   ├── StreamExpiryManager.swift     stream URL TTL tracking
+│   └── NowPlayingManager.swift       Control Center integration
+├── Queue/
+│   ├── QueueItem.swift               queue item model
+│   ├── QueueManager.swift            queue CRUD + persistence
+│   └── QueueManagerProtocol.swift    queue protocol
 ├── Services/
-│   └── PlaylistImportService.swift
-├── Managers/
-│   ├── AudioPlayer.swift
-│   ├── QueueManager.swift
-│   ├── BackgroundManager.swift
-│   ├── DiscoveryManager.swift
-│   ├── FavoritesManager.swift
-│   └── NowPlayingManager.swift
-├── Providers/
-│   ├── YouTubeProvider.swift
-│   └── SoundCloudProvider.swift
-└── Resources/
-
-Tests/MyMoThErWoUlDnTaDoPtMe/
-├── PlaylistImportServiceTests.swift
-└── CoreDataTests.swift 
-
+│   ├── YTDLP.swift                   yt-dlp CLI wrapper
+│   ├── PlaylistService.swift         playlist CRUD
+│   └── PlaylistImportService.swift   import from URL
+├── ViewModels/
+│   ├── SearchViewModel.swift         search with debounce
+│   └── FavoritesManager.swift        favorites (UserDefaults)
+├── Views/
+│   ├── DesignTokens.swift            spacing, colors, fonts
+│   ├── ControlCenterView.swift       main panel
+│   ├── QueuePanelView.swift          queue sidebar
+│   ├── NowPlayingBar.swift           player bar
+│   ├── SettingsView.swift            settings
+│   ├── BackgroundContainer.swift     background renderer
+│   ├── VideoBackgroundView.swift     AVPlayer layer
+│   ├── KeyboardShortcutsHandler.swift
+│   └── ... (search, playlists, artwork, empty states)
+├── Resources/
+│   ├── 3LF5bEk.mp4                   default background video
+│   └── AppIcon.icns                  app icon
+└── Assets.xcassets/                  icon assets
 ```
+
+## How it works
+
+**AudioPlayer** wraps `AVPlayer` with dual-player crossfade. **QueueManager** holds the track list, persists to UserDefaults, and advances on track end. **PlaylistImportService** parses YouTube/SoundCloud playlist URLs, extracts IDs, fetches track lists via Piped API (YouTube) or SoundCloud API v2, and stores them in CoreData.
+
+**DiscoveryManager** runs after each track finishes. It calls `track.getSimilar` on Last.fm, falls back to `artist.getSimilar` → `artist.getTopTracks` if needed, picks a track weighted by match percentage, searches YouTube/SoundCloud for it via yt-dlp, and queues the result. A variety slider controls how close matches are.
+
+**BackgroundManager** renders video via `AVQueuePlayer` with `AVPlayerLooper`, images via `NSImage`, GIFs via `AVQueuePlayer`. Playlists can bind a background; switching playlists switches the background.
+
+Stream URLs expire. **StreamExpiryManager** tracks TTL per stream (30min–4hr configurable) and re-resolves the URL before playback.
+
+## Keyboard shortcuts
+
+| Key | Action |
+|-----|--------|
+| Space | Play/Pause |
+| Left/Right | Previous/Next track |
+| Up/Down | Volume ± |
+| S | Toggle shuffle |
+| R | Toggle repeat |
+| L | Toggle discovery |
+| Cmd+F | Focus search |
+| Escape | Toggle control panel |
 
 ## Contributing
 
-Contributions are welcome! See [CONTRIBUTING.md](CONTRIBUTING.md) for guidelines.
+See [CONTRIBUTING.md](CONTRIBUTING.md).
 
 ## Support
 
-If you enjoy this project, consider supporting it:
-
 [![Donate](https://img.shields.io/badge/Donate-DonationAlerts-red.svg)](https://www.donationalerts.com/r/mymommyplayer)
 
-## License 
+## License
 
-MIT - See [LICENSE](LICENSE) for details
+MIT — see [LICENSE](LICENSE).
