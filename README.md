@@ -129,10 +129,6 @@ Stream URLs expire. **StreamExpiryManager** tracks TTL per stream (30min–4hr c
 | Cmd+F | Focus search |
 | Escape | Toggle control panel |
 
-## Contributing
-
-See [CONTRIBUTING.md](CONTRIBUTING.md).
-
 ## Support
 
 [![Donate](https://img.shields.io/badge/Donate-DonationAlerts-red.svg)](https://www.donationalerts.com/r/mymommyplayer)
