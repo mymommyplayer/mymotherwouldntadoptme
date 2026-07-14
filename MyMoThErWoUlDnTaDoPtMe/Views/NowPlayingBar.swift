@@ -5,7 +5,6 @@ struct NowPlayingBar: View {
     @ObservedObject var queueManager: QueueManager
     @ObservedObject var appState: AppState
     @ObservedObject var favoritesManager: FavoritesManager
-    @ObservedObject var sleepTimerManager: SleepTimerManager
     let discoveryManager: DiscoveryManager?
     @Binding var volume: Double
     @Binding var isControlCenterOpen: Bool
@@ -134,7 +133,6 @@ struct NowPlayingBar: View {
 
             HStack(spacing: Spacing.medium) {
                 volumeButton
-                sleepTimerButton
                 shuffleButton
                 prevButton
                 playPauseButton
@@ -200,39 +198,7 @@ struct NowPlayingBar: View {
         }
     }
 
-    private var sleepTimerButton: some View {
-        Menu {
-            if sleepTimerManager.isActive {
-                Text("Remaining: \(sleepTimerManager.formattedRemaining)")
-                Button("Add 5 min") { sleepTimerManager.addMinutes(5) }
-                Button("Add 15 min") { sleepTimerManager.addMinutes(15) }
-                Divider()
-                Button("Cancel", role: .destructive) { sleepTimerManager.stop() }
-            } else {
-                Button("15 min") { startSleepTimer(minutes: 15) }
-                Button("30 min") { startSleepTimer(minutes: 30) }
-                Button("45 min") { startSleepTimer(minutes: 45) }
-                Button("60 min") { startSleepTimer(minutes: 60) }
-                Button("90 min") { startSleepTimer(minutes: 90) }
-            }
-        } label: {
-            Image(systemName: sleepTimerManager.isActive ? "moon.zzz.fill" : "moon.zzz")
-                .font(AppFont.smallIcon)
-                .foregroundColor(sleepTimerManager.isActive ? .accentGlass : .glassForegroundTertiary)
-                .frame(minWidth: PanelSize.hitArea, minHeight: PanelSize.hitArea)
-                .contentShape(Rectangle())
-        }
-        .menuStyle(.borderlessButton)
-        .frame(minWidth: PanelSize.hitArea, minHeight: PanelSize.hitArea)
-        .help(sleepTimerManager.isActive ? "Sleep timer: \(sleepTimerManager.formattedRemaining)" : "Sleep timer")
-        .accessibilityLabel("Sleep timer")
-    }
 
-    private func startSleepTimer(minutes: Int) {
-        sleepTimerManager.start(minutes: minutes) { [audioPlayer] in
-            audioPlayer.stop()
-        }
-    }
 
     private var shuffleButton: some View {
         Button { appState.isShuffled.toggle() } label: {

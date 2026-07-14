@@ -68,7 +68,6 @@ struct ContentView: View {
                     queueManager: container.queueManager,
                     appState: appState,
                     favoritesManager: container.favoritesManager,
-                    sleepTimerManager: container.sleepTimerManager,
                     discoveryManager: container.discoveryManager,
                     volume: $volume,
                     isControlCenterOpen: $isControlCenterOpen,
