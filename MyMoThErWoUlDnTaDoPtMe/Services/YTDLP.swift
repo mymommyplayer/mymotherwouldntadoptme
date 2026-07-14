@@ -21,6 +21,7 @@ struct YTDLPSearchItem: Decodable {
     let uploader: String?
     let duration: Double?
     let thumbnails: [YTDLPThumbnail]?
+    let url: String?
 
     init(from decoder: Decoder) throws {
         let container = try decoder.container(keyedBy: CodingKeys.self)
@@ -34,10 +35,11 @@ struct YTDLPSearchItem: Decodable {
         uploader = try container.decodeIfPresent(String.self, forKey: .uploader)
         duration = try container.decodeIfPresent(Double.self, forKey: .duration)
         thumbnails = try container.decodeIfPresent([YTDLPThumbnail].self, forKey: .thumbnails)
+        url = try container.decodeIfPresent(String.self, forKey: .url)
     }
 
     private enum CodingKeys: String, CodingKey {
-        case id, title, channel, uploader, duration, thumbnails
+        case id, title, channel, uploader, duration, thumbnails, url
     }
 }
 
@@ -124,6 +126,7 @@ struct YTDLP {
                   !item.id.isEmpty else { continue }
             let artist = item.channel ?? item.uploader ?? "Unknown"
             let thumb = item.thumbnails?.first.flatMap { URL(string: $0.url) }
+            let webpageURL = item.url.flatMap { URL(string: $0) }
             results.append(SearchResult(
                 id: item.id,
                 title: item.title,
@@ -131,7 +134,8 @@ struct YTDLP {
                 duration: item.duration ?? 0,
                 source: source,
                 thumbnailURL: thumb,
-                streamURL: nil
+                streamURL: nil,
+                webpageURL: webpageURL
             ))
         }
 

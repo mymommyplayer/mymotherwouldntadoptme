@@ -2,7 +2,6 @@ import SwiftUI
 
 struct QueuePanelView: View {
     @ObservedObject var queueManager: QueueManager
-    @State private var dragIndex: Int?
 
     var body: some View {
         VStack(spacing: 0) {
@@ -38,41 +37,31 @@ struct QueuePanelView: View {
     }
 
     private var queueList: some View {
-        let qm = queueManager
-        return ScrollView {
-            if qm.items.isEmpty {
+        List {
+            if queueManager.items.isEmpty {
                 EmptyStateView(
                     icon: "music.note.list",
                     title: "Queue is empty",
                     subtitle: "Add tracks from search or playlists."
                 )
                 .padding(.top, 40)
+                .listRowBackground(Color.clear)
+                .listRowSeparator(.hidden)
             } else {
-                VStack(spacing: 0) {
-                    ForEach(Array(qm.items.enumerated()), id: \.element.id) { index, item in
-                        queueItemRow(index: index, item: item)
-                            .opacity(dragIndex == index ? 0.4 : 1)
-                            .onDrag {
-                                dragIndex = index
-                                return NSItemProvider(object: item.id as NSString)
-                            }
-                            .onDrop(
-                                of: [.text],
-                                delegate: QueueDropDelegate(
-                                    queueManager: qm,
-                                    index: index,
-                                    dragIndex: $dragIndex
-                                )
-                            )
-                        if index < qm.items.count - 1 {
-                            Color.clear
-                                .frame(height: 1)
-                                .background(Color.glassForegroundTertiary.opacity(0.1))
+                ForEach(Array(queueManager.items.enumerated()), id: \.element.id) { index, item in
+                    queueItemRow(index: index, item: item)
+                        .listRowBackground(Color.clear)
+                        .listRowSeparator(.hidden)
+                        .onDrag {
+                            return NSItemProvider(object: item.id as NSString)
                         }
-                    }
                 }
+                .onMove(perform: moveItems)
+                .onDrop(of: [.text], delegate: QueueDropDelegate(queueManager: queueManager))
             }
         }
+        .listStyle(.plain)
+        .scrollContentBackground(.hidden)
         .onDrop(of: [NSPasteboard.PasteboardType.playlistTrack.rawValue], isTargeted: nil) { providers -> Bool in
             guard let provider = providers.first else { return false }
             provider.loadItem(forTypeIdentifier: NSPasteboard.PasteboardType.playlistTrack.rawValue, options: nil) { item, _ in
@@ -90,7 +79,7 @@ struct QueuePanelView: View {
                                 thumbnailURL: url,
                                 streamURL: nil
                             )
-                            qm.add(QueueItem(id: dragged.trackID, track: track, source: dragged.source))
+                            queueManager.add(QueueItem(id: dragged.trackID, track: track, source: dragged.source))
                         }
                     }
                 } else if let dragged = try? JSONDecoder().decode(DraggedTrack.self, from: data) {
@@ -105,12 +94,16 @@ struct QueuePanelView: View {
                         streamURL: nil
                     )
                     Task { @MainActor in
-                        qm.add(QueueItem(id: dragged.trackID, track: track, source: dragged.source))
+                        queueManager.add(QueueItem(id: dragged.trackID, track: track, source: dragged.source))
                     }
                 }
             }
             return true
         }
+    }
+
+    private func moveItems(from source: IndexSet, to destination: Int) {
+        queueManager.move(from: source, to: destination)
     }
 
     private func queueItemRow(index: Int, item: QueueItem) -> some View {
@@ -163,21 +156,12 @@ struct QueuePanelView: View {
 
 struct QueueDropDelegate: DropDelegate {
     let queueManager: QueueManager
-    let index: Int
-    @Binding var dragIndex: Int?
 
     func performDrop(info: DropInfo) -> Bool {
-        defer { dragIndex = nil }
-        guard let from = dragIndex, from != index else { return false }
-        queueManager.move(from: IndexSet(integer: from), to: index > from ? index + 1 : index)
         return true
     }
 
     func dropUpdated(info: DropInfo) -> DropProposal? {
         DropProposal(operation: .move)
-    }
-
-    func dropExited(info: DropInfo) {
-        dragIndex = nil
     }
 }

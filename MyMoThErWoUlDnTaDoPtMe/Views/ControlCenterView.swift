@@ -38,6 +38,7 @@ struct ControlCenterView: View {
     var playlistService: PlaylistService?
     @Binding var focusSearch: Bool
     @Binding var isControlCenterOpen: Bool
+    @Binding var selectedPlaylist: PlaylistEntity?
     @Environment(\.managedObjectContext) var viewContext
 
     @FetchRequest(
@@ -123,6 +124,9 @@ struct ControlCenterView: View {
             case .success(let url):
                 editingPlaylist?.backgroundPath = url.path
                 PersistenceController.saveWithAlert(context: viewContext)
+                if let playlist = editingPlaylist, playlist == selectedPlaylist {
+                    selectedPlaylist = playlist
+                }
             case .failure(let error):
                 errorMessage = error.localizedDescription
                 showError = true
@@ -339,7 +343,10 @@ struct ControlCenterView: View {
         }
         .frame(maxWidth: .infinity)
         .contentShape(Rectangle())
-        .onTapGesture { editingPlaylist = playlist }
+        .onTapGesture {
+            editingPlaylist = playlist
+            selectedPlaylist = playlist
+        }
         .help("Drag to queue")
         .onDrag {
             let data = try? JSONEncoder().encode(playlist.tracksArray.map { track in
@@ -357,8 +364,15 @@ struct ControlCenterView: View {
             return provider
         }
         .contextMenu {
-            Button("Open") { editingPlaylist = playlist }
-            Button("Background") { editingPlaylist = playlist; showFilePicker = true }
+            Button("Open") {
+                editingPlaylist = playlist
+                selectedPlaylist = playlist
+            }
+            Button("Background") {
+                editingPlaylist = playlist
+                selectedPlaylist = playlist
+                showFilePicker = true
+            }
             if !playlist.tracksArray.isEmpty {
                 Button("Add to Queue") { addPlaylistToQueue(playlist) }
             }

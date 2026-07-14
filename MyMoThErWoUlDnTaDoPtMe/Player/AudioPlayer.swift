@@ -11,7 +11,7 @@ class AudioPlayer: ObservableObject, AudioPlayerProtocol {
     var onDiscoveryTrigger: ((SearchResult) -> Void)?
 
     private var primaryPlayer: AVPlayer?
-    private var secondaryPlayer: AVPlayer?
+    private var crossfadingOldPlayer: AVPlayer?
     private var timeObserver: Any?
     private var durationObserver: NSKeyValueObservation?
     private var endObserver: NSObjectProtocol?
@@ -32,7 +32,6 @@ class AudioPlayer: ObservableObject, AudioPlayerProtocol {
 
     func setVolume(_ volume: Float) {
         primaryPlayer?.volume = volume
-        secondaryPlayer?.volume = volume
     }
 
     func play(url: URL, track: SearchResult? = nil) {
@@ -108,6 +107,11 @@ class AudioPlayer: ObservableObject, AudioPlayerProtocol {
             startPlayback(url: url, track: track)
             return
         }
+
+        let oldVolume = oldPlayer.volume
+
+        cancelCrossfade()
+
         isCrossfading = true
         generation &+= 1
         let gen = generation
@@ -118,19 +122,16 @@ class AudioPlayer: ObservableObject, AudioPlayerProtocol {
         newPlayer.volume = 0
         newPlayer.play()
 
-        let oldVolume = oldPlayer.volume
-
         if let oldObs = timeObserver {
             oldPlayer.removeTimeObserver(oldObs)
             timeObserver = nil
         }
         primaryPlayer = newPlayer
-        secondaryPlayer = newPlayer
+        crossfadingOldPlayer = oldPlayer
         currentTrack = track
 
         let startTime = CACurrentMediaTime()
-        let interval = 1.0 / 60.0
-        crossfadeTimer?.invalidate()
+        let interval = 1.0 / 30.0
         crossfadeTimer = Timer.scheduledTimer(withTimeInterval: interval, repeats: true) { [weak self] t in
             guard let self else { t.invalidate(); return }
             let elapsed = CACurrentMediaTime() - startTime
@@ -140,10 +141,21 @@ class AudioPlayer: ObservableObject, AudioPlayerProtocol {
 
             if progress >= 1 {
                 t.invalidate()
-                completeCrossfade(gen: gen, oldPlayer: oldPlayer, newPlayer: newPlayer, newItem: newItem)
+                self.completeCrossfade(gen: gen, oldPlayer: oldPlayer, newPlayer: newPlayer, newItem: newItem)
             }
         }
         RunLoop.main.add(crossfadeTimer!, forMode: .common)
+    }
+
+    private func cancelCrossfade() {
+        crossfadeTimer?.invalidate()
+        crossfadeTimer = nil
+
+        if isCrossfading, let old = crossfadingOldPlayer {
+            old.replaceCurrentItem(with: nil)
+            crossfadingOldPlayer = nil
+        }
+        isCrossfading = false
     }
 
     private func completeCrossfade(gen: Int, oldPlayer: AVPlayer, newPlayer: AVPlayer, newItem: AVPlayerItem) {
@@ -153,7 +165,7 @@ class AudioPlayer: ObservableObject, AudioPlayerProtocol {
         durationObserver?.invalidate()
 
         oldPlayer.replaceCurrentItem(with: nil)
-        secondaryPlayer = nil
+        crossfadingOldPlayer = nil
         isCrossfading = false
         didReportEnd = false
         discoveryTriggeredAt = -1
@@ -208,10 +220,8 @@ class AudioPlayer: ObservableObject, AudioPlayerProtocol {
     }
 
     private func cleanup() {
-        guard !isCrossfading else { return }
+        cancelCrossfade()
         generation &+= 1
-        crossfadeTimer?.invalidate()
-        crossfadeTimer = nil
         durationObserver?.invalidate()
         durationObserver = nil
         if let observer = timeObserver {
@@ -224,8 +234,8 @@ class AudioPlayer: ObservableObject, AudioPlayerProtocol {
         }
         primaryPlayer?.replaceCurrentItem(with: nil)
         primaryPlayer = nil
-        secondaryPlayer?.replaceCurrentItem(with: nil)
-        secondaryPlayer = nil
+        crossfadingOldPlayer?.replaceCurrentItem(with: nil)
+        crossfadingOldPlayer = nil
         didReportEnd = false
         discoveryTriggeredAt = -1
         currentTrack = nil

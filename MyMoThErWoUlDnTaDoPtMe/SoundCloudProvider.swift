@@ -42,7 +42,13 @@ struct SoundCloudProvider: SourceProvider {
     }
 
     func streamURL(for result: SearchResult) async throws -> URL {
-        guard let url = URL(string: "https://api.soundcloud.com/tracks/\(result.id)") else {
+        let urlString: String
+        if let webpage = result.webpageURL {
+            urlString = webpage.absoluteString
+        } else {
+            urlString = "https://api.soundcloud.com/tracks/\(result.id)"
+        }
+        guard let url = URL(string: urlString) else {
             throw AppError.sourceUnavailable("Invalid SoundCloud URL")
         }
         return try await YTDLP.extractStreamURL(webpageURL: url.absoluteString)

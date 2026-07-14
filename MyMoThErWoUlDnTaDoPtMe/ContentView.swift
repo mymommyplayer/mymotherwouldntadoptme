@@ -55,7 +55,8 @@ struct ContentView: View {
                     playlistImportService: container.playlistImportService,
                     playlistService: container.playlistService,
                     focusSearch: $focusSearch,
-                    isControlCenterOpen: $isControlCenterOpen
+                    isControlCenterOpen: $isControlCenterOpen,
+                    selectedPlaylist: $selectedPlaylist
                 )
                 .frame(maxHeight: containerHeight * 0.78)
                 .opacity(isControlCenterOpen ? 1 : 0)
