@@ -1,0 +1,35 @@
+name: MyMoThErWoUlDnTaDoPtMe
+options:
+  bundleIdPrefix: com.mymother
+  deploymentTarget:
+    macOS: "14.0"
+  generateEmptyDirectories: true
+
+settings:
+  base:
+    SWIFT_VERSION: "5.9"
+    MACOSX_DEPLOYMENT_TARGET: "14.0"
+    CODE_SIGN_STYLE: Automatic
+    PRODUCT_NAME: MyMoThErWoUlDnTaDoPtMe
+    INFOPLIST_FILE: MyMoThErWoUlDnTaDoPtMe/Info.plist
+    ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
+    CONFIGURATION_SETTINGS_FILE: Config.xcconfig
+
+targets:
+  MyMoThErWoUlDnTaDoPtMe:
+    type: application
+    platform: macOS
+    sources:
+      - path: MyMoThErWoUlDnTaDoPtMe
+        excludes:
+          - "Resources"
+          - "Assets.xcassets"
+    resources:
+      - path: MyMoThErWoUlDnTaDoPtMe/3LF5bEk.mp4
+      - path: MyMoThErWoUlDnTaDoPtMe/Assets.xcassets
+    settings:
+      base:
+        INFOPLIST_FILE: MyMoThErWoUlDnTaDoPtMe/Info.plist
+        CODE_SIGN_ENTITLEMENTS: MyMoThErWoUlDnTaDoPtMe/MyMoThErWoUlDnTaDoPtMe.entitlements
+    entitlements:
+      path: MyMoThErWoUlDnTaDoPtMe/MyMoThErWoUlDnTaDoPtMe.entitlements

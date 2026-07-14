@@ -1,0 +1,35 @@
+.worktrees/
+Config.xcconfig
+.build/
+.swiftpm/
+DerivedData/
+*.xcuserdata
+.DS_Store
+*.app
+
+# Swiftpm build artifacts
+/.build/
+/Packages
+.swiftpm/
+
+# Xcode
+xcuserdata/
+*.xcbkptlist
+*.resolved
+
+# macOS
+.AppleDouble
+.LSOverride
+
+# Swift
+*.swiftpm
+
+# IDEs
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Misc
+.env
+.env.local
