@@ -21,6 +21,7 @@ class AudioPlayer: ObservableObject, AudioPlayerProtocol {
     private var discoveryTriggeredAt: Double = -1
     private var generation = 0
     private var crossfadeTimer: Timer?
+    private var settingsObservation: Any?
 
     private var crossfadeEnabled: Bool {
         UserDefaults.standard.bool(forKey: SettingsKeys.crossfadeEnabled)
@@ -28,6 +29,23 @@ class AudioPlayer: ObservableObject, AudioPlayerProtocol {
 
     private var crossfadeDuration: TimeInterval {
         max(0.5, UserDefaults.standard.double(forKey: SettingsKeys.crossfadeDuration))
+    }
+
+    init() {
+        settingsObservation = NotificationCenter.default.addObserver(
+            forName: UserDefaults.didChangeNotification,
+            object: nil,
+            queue: .main
+        ) { [weak self] _ in
+            _ = self?.crossfadeEnabled
+            _ = self?.crossfadeDuration
+        }
+    }
+
+    deinit {
+        if let settingsObservation {
+            NotificationCenter.default.removeObserver(settingsObservation)
+        }
     }
 
     func setVolume(_ volume: Float) {
@@ -43,10 +61,16 @@ class AudioPlayer: ObservableObject, AudioPlayerProtocol {
     }
 
     private func startPlayback(url: URL, track: SearchResult? = nil) {
-        cleanup()
+        let oldPlayer = primaryPlayer
+        let oldTimeObserver = timeObserver
+        let oldEndObserver = endObserver
+        let oldDurationObserver = durationObserver
+
         generation &+= 1
         let gen = generation
         currentTrack = track
+        didReportEnd = false
+        discoveryTriggeredAt = -1
 
         let playerItem = AVPlayerItem(url: url)
         primaryPlayer = AVPlayer(playerItem: playerItem)
@@ -100,6 +124,15 @@ class AudioPlayer: ObservableObject, AudioPlayerProtocol {
                 }
             }
         }
+
+        if let oldPlayer, let oldTimeObserver {
+            oldPlayer.removeTimeObserver(oldTimeObserver)
+        }
+        if let oldEndObserver {
+            NotificationCenter.default.removeObserver(oldEndObserver)
+        }
+        oldDurationObserver?.invalidate()
+        oldPlayer?.replaceCurrentItem(with: nil)
     }
 
     private func crossfadeTo(url: URL, track: SearchResult? = nil) {

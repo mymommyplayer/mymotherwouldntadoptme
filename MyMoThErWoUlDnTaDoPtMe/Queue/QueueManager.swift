@@ -51,6 +51,11 @@ class QueueManager: ObservableObject, QueueManagerProtocol {
         return streamExpiry.isStreamExpired(for: url)
     }
 
+    func needsStreamRefresh(for track: SearchResult) -> Bool {
+        guard let url = track.streamURL?.absoluteString else { return true }
+        return streamExpiry.isStreamExpired(for: url)
+    }
+
     func remove(at index: Int) {
         guard items.indices.contains(index) else { return }
         let item = items[index]
@@ -146,5 +151,31 @@ class QueueManager: ObservableObject, QueueManagerProtocol {
         items.removeAll()
         currentIndex = nil
         persist()
+    }
+
+    // MARK: - Error Handling
+
+    func setError(on index: Int) {
+        guard items.indices.contains(index) else { return }
+        items[index].state = .error
+        persist()
+    }
+
+    func advanceSkippingErrors() {
+        guard let idx = currentIndex else { return }
+        var next = idx + 1
+        while next < items.count, items[next].state == .error {
+            next += 1
+        }
+        if next < items.count {
+            currentIndex = next
+        } else {
+            currentIndex = nil
+        }
+        persist()
+    }
+
+    func registerStream(for itemID: String, url: URL) {
+        streamExpiry.registerStream(for: url.absoluteString)
     }
 }

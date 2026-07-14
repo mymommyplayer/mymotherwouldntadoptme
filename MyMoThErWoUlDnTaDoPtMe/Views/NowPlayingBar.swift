@@ -5,12 +5,15 @@ struct NowPlayingBar: View {
     @ObservedObject var queueManager: QueueManager
     @ObservedObject var appState: AppState
     @ObservedObject var favoritesManager: FavoritesManager
+    @ObservedObject var sleepTimerManager: SleepTimerManager
     let discoveryManager: DiscoveryManager?
     @Binding var volume: Double
     @Binding var isControlCenterOpen: Bool
     @Binding var discoveryRefresh: Bool
     @Binding var discoverySpinAngle: Double
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @State private var dragProgress: CGFloat?
+    @State private var isDragging = false
 
     var body: some View {
         VStack(spacing: 0) {
@@ -42,19 +45,47 @@ struct NowPlayingBar: View {
                     .fill(.white.opacity(0.15))
                     .frame(height: 2)
 
+                let displayFraction = dragProgress ?? progressFraction
                 Rectangle()
                     .fill(.white.opacity(0.5))
-                    .frame(width: geo.size.width * progressFraction, height: 2)
+                    .frame(width: geo.size.width * displayFraction, height: 2)
+
+                if isDragging, let dragProgress {
+                    Circle()
+                        .fill(.white)
+                        .frame(width: 10, height: 10)
+                        .offset(x: geo.size.width * dragProgress - 5, y: 0)
+
+                    Text(formattedDuration(Double(dragProgress) * audioPlayer.duration))
+                        .font(AppFont.small)
+                        .monospacedDigit()
+                        .foregroundColor(.glassForeground)
+                        .padding(.horizontal, 6)
+                        .padding(.vertical, 2)
+                        .background(.black.opacity(0.7))
+                        .clipShape(RoundedRectangle(cornerRadius: 4))
+                        .position(x: geo.size.width * dragProgress, y: -12)
+                }
 
                 Color.clear
                     .contentShape(Rectangle())
                     .gesture(
                         DragGesture(minimumDistance: 0)
+                            .onChanged { v in
+                                let w = geo.size.width
+                                let fraction = w > 0 ? max(0, min(1, v.location.x / w)) : 0
+                                dragProgress = fraction
+                                isDragging = true
+                            }
                             .onEnded { v in
                                 let w = geo.size.width
                                 let fraction = w > 0 ? max(0, min(1, v.location.x / w)) : 0
                                 let time = Double(fraction) * audioPlayer.duration
                                 audioPlayer.seek(to: time)
+                                withAnimation(.easeOut(duration: 0.15)) {
+                                    dragProgress = nil
+                                    isDragging = false
+                                }
                             }
                     )
             }
@@ -66,6 +97,13 @@ struct NowPlayingBar: View {
     private var progressFraction: CGFloat {
         guard audioPlayer.duration > 0 else { return 0 }
         return min(1, CGFloat(audioPlayer.currentTime / audioPlayer.duration))
+    }
+
+    private func formattedDuration(_ duration: TimeInterval) -> String {
+        guard duration.isFinite, duration >= 0 else { return "0:00" }
+        let m = Int(duration) / 60
+        let s = Int(duration) % 60
+        return "\(m):\(String(format: "%02d", s))"
     }
 
     // MARK: - Controls Bar
@@ -96,6 +134,7 @@ struct NowPlayingBar: View {
 
             HStack(spacing: Spacing.medium) {
                 volumeButton
+                sleepTimerButton
                 shuffleButton
                 prevButton
                 playPauseButton
@@ -158,6 +197,40 @@ struct NowPlayingBar: View {
                         .offset(y: 6)
                     }
                 )
+        }
+    }
+
+    private var sleepTimerButton: some View {
+        Menu {
+            if sleepTimerManager.isActive {
+                Text("Remaining: \(sleepTimerManager.formattedRemaining)")
+                Button("Add 5 min") { sleepTimerManager.addMinutes(5) }
+                Button("Add 15 min") { sleepTimerManager.addMinutes(15) }
+                Divider()
+                Button("Cancel", role: .destructive) { sleepTimerManager.stop() }
+            } else {
+                Button("15 min") { startSleepTimer(minutes: 15) }
+                Button("30 min") { startSleepTimer(minutes: 30) }
+                Button("45 min") { startSleepTimer(minutes: 45) }
+                Button("60 min") { startSleepTimer(minutes: 60) }
+                Button("90 min") { startSleepTimer(minutes: 90) }
+            }
+        } label: {
+            Image(systemName: sleepTimerManager.isActive ? "moon.zzz.fill" : "moon.zzz")
+                .font(AppFont.smallIcon)
+                .foregroundColor(sleepTimerManager.isActive ? .accentGlass : .glassForegroundTertiary)
+                .frame(minWidth: PanelSize.hitArea, minHeight: PanelSize.hitArea)
+                .contentShape(Rectangle())
+        }
+        .menuStyle(.borderlessButton)
+        .frame(minWidth: PanelSize.hitArea, minHeight: PanelSize.hitArea)
+        .help(sleepTimerManager.isActive ? "Sleep timer: \(sleepTimerManager.formattedRemaining)" : "Sleep timer")
+        .accessibilityLabel("Sleep timer")
+    }
+
+    private func startSleepTimer(minutes: Int) {
+        sleepTimerManager.start(minutes: minutes) { [audioPlayer] in
+            audioPlayer.stop()
         }
     }
 

@@ -177,7 +177,47 @@ final class PersistenceController {
         playlistEntity.properties = [playlistID, playlistName, playlistCreatedAt, playlistBackgroundPath, tracksRelation]
         trackEntity.properties = [trackIDAttr, trackIndex, trackTrackID, trackTitle, trackArtist, trackDuration, trackSource, trackThumbnailURL, playlistRelation]
 
-        model.entities = [playlistEntity, trackEntity]
+        // FavoriteTrackEntity
+        let favoriteEntity = NSEntityDescription()
+        favoriteEntity.name = "FavoriteTrackEntity"
+        favoriteEntity.managedObjectClassName = "FavoriteTrackEntity"
+
+        let favID = NSAttributeDescription()
+        favID.name = "id"
+        favID.attributeType = .UUIDAttributeType
+
+        let favTrackID = NSAttributeDescription()
+        favTrackID.name = "trackID"
+        favTrackID.attributeType = .stringAttributeType
+
+        let favTitle = NSAttributeDescription()
+        favTitle.name = "title"
+        favTitle.attributeType = .stringAttributeType
+
+        let favArtist = NSAttributeDescription()
+        favArtist.name = "artist"
+        favArtist.attributeType = .stringAttributeType
+
+        let favDuration = NSAttributeDescription()
+        favDuration.name = "duration"
+        favDuration.attributeType = .doubleAttributeType
+
+        let favSource = NSAttributeDescription()
+        favSource.name = "source"
+        favSource.attributeType = .stringAttributeType
+
+        let favThumbnailURL = NSAttributeDescription()
+        favThumbnailURL.name = "thumbnailURL"
+        favThumbnailURL.attributeType = .stringAttributeType
+        favThumbnailURL.isOptional = true
+
+        let favAddedAt = NSAttributeDescription()
+        favAddedAt.name = "addedAt"
+        favAddedAt.attributeType = .dateAttributeType
+
+        favoriteEntity.properties = [favID, favTrackID, favTitle, favArtist, favDuration, favSource, favThumbnailURL, favAddedAt]
+
+        model.entities = [playlistEntity, trackEntity, favoriteEntity]
         return model
     }
 }

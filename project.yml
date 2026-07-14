@@ -12,7 +12,6 @@ settings:
     CODE_SIGN_STYLE: Automatic
     PRODUCT_NAME: MyMoThErWoUlDnTaDoPtMe
     INFOPLIST_FILE: MyMoThErWoUlDnTaDoPtMe/Info.plist
-    ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
     CONFIGURATION_SETTINGS_FILE: Config.xcconfig
 
 targets:
@@ -22,14 +21,24 @@ targets:
     sources:
       - path: MyMoThErWoUlDnTaDoPtMe
         excludes:
-          - "Resources"
-          - "Assets.xcassets"
-    resources:
-      - path: MyMoThErWoUlDnTaDoPtMe/3LF5bEk.mp4
-      - path: MyMoThErWoUlDnTaDoPtMe/Assets.xcassets
+          - "Resources/AppIcon.icns"
+          - "Resources/AppIcon.iconset"
     settings:
       base:
         INFOPLIST_FILE: MyMoThErWoUlDnTaDoPtMe/Info.plist
         CODE_SIGN_ENTITLEMENTS: MyMoThErWoUlDnTaDoPtMe/MyMoThErWoUlDnTaDoPtMe.entitlements
+        ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
     entitlements:
       path: MyMoThErWoUlDnTaDoPtMe/MyMoThErWoUlDnTaDoPtMe.entitlements
+
+  MyMoThErWoUlDnTaDoPtMeTests:
+    type: bundle.unit-test
+    platform: macOS
+    sources:
+      - path: Tests
+    dependencies:
+      - target: MyMoThErWoUlDnTaDoPtMe
+    settings:
+      base:
+        CODE_SIGN_STYLE: Automatic
+        BUNDLE_LOADER: "$(TEST_HOST)"

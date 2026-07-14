@@ -68,10 +68,11 @@ struct PlaylistEditSheet: View {
             allowedContentTypes: [.image, .mpeg4Movie, .gif]
         ) { result in
             if case .success(let url) = result {
+                let copiedPath = PlaylistService.copyToContainer(url)
                 if let service = playlistService {
-                    try? service.updateBackground(playlist, path: url.path)
+                    try? service.updateBackground(playlist, path: copiedPath ?? url.path)
                 } else {
-                    playlist.backgroundPath = url.path
+                    playlist.backgroundPath = copiedPath ?? url.path
                     PersistenceController.saveWithAlert(context: viewContext)
                 }
             }

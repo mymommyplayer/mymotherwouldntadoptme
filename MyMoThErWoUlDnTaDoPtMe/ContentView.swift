@@ -51,6 +51,7 @@ struct ContentView: View {
                     queueManager: container.queueManager,
                     audioPlayer: container.audioPlayer,
                     favoritesManager: container.favoritesManager,
+                    searchHistoryManager: container.searchHistoryManager,
                     onPlay: playSearchResult,
                     playlistImportService: container.playlistImportService,
                     playlistService: container.playlistService,
@@ -67,6 +68,7 @@ struct ContentView: View {
                     queueManager: container.queueManager,
                     appState: appState,
                     favoritesManager: container.favoritesManager,
+                    sleepTimerManager: container.sleepTimerManager,
                     discoveryManager: container.discoveryManager,
                     volume: $volume,
                     isControlCenterOpen: $isControlCenterOpen,
@@ -156,6 +158,10 @@ struct ContentView: View {
                 return
             }
             let item = container.queueManager.items[idx]
+            if item.state == .error {
+                container.queueManager.advanceSkippingErrors()
+                return
+            }
             playOrResolve(item.track)
             container.discoveryManager?.trackDidStart(item.track)
         }
@@ -165,6 +171,10 @@ struct ContentView: View {
             } else if let idx = container.queueManager.currentIndex,
                       items.indices.contains(idx) {
                 let item = items[idx]
+                if item.state == .error {
+                    container.queueManager.advanceSkippingErrors()
+                    return
+                }
                 guard item.track.id != container.audioPlayer.currentTrack?.id else { return }
                 playOrResolve(item.track)
                 container.discoveryManager?.trackDidStart(item.track)
@@ -203,7 +213,7 @@ struct ContentView: View {
                 return
             }
 
-            qm.advance()
+            qm.advanceSkippingErrors()
             np?.clear()
 
             if qm.currentIndex == nil {
@@ -246,8 +256,11 @@ struct ContentView: View {
     }
 
     private func playOrResolve(_ track: SearchResult) {
-        if let url = track.streamURL {
+        let needsRefresh = container.queueManager.needsStreamRefresh(for: track)
+
+        if let url = track.streamURL, !needsRefresh {
             container.audioPlayer.play(url: url, track: track)
+            container.queueManager.registerStream(for: track.id, url: url)
         } else {
             Task {
                 do {
@@ -255,8 +268,12 @@ struct ContentView: View {
                         ? container.youTubeProvider : container.soundCloudProvider
                     let resolved = try await provider.streamURL(for: track)
                     container.audioPlayer.play(url: resolved, track: track)
+                    container.queueManager.registerStream(for: track.id, url: resolved)
                 } catch {
-                    appState.error = error
+                    if let idx = container.queueManager.items.firstIndex(where: { $0.track.id == track.id }) {
+                        container.queueManager.setError(on: idx)
+                    }
+                    container.queueManager.advanceSkippingErrors()
                 }
             }
         }

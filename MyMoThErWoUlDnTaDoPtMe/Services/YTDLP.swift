@@ -157,34 +157,41 @@ struct YTDLP {
 
         try task.run()
 
-        return try await withTaskCancellationHandler(
-            handler: { task.terminate() },
-            operation: {
+        let result: String = try await withThrowingTaskGroup(of: String?.self) { group in
+            group.addTask {
                 try await withCheckedThrowingContinuation { continuation in
-                    queue.async {
-                        let timedOut = waitWithTimeout(task, timeout: processTimeout)
-                        if timedOut {
-                            continuation.resume(throwing: YTDLPError.extractionFailed("Timeout after \(Int(processTimeout))s"))
-                            return
-                        }
-                        guard task.terminationStatus == 0 else {
-                            let errorData = errorPipe.fileHandleForReading.readDataToEndOfFile()
-                            let msg = String(data: errorData, encoding: .utf8) ?? "Unknown error"
-                            continuation.resume(throwing: YTDLPError.extractionFailed(msg))
-                            return
-                        }
+                    task.terminationHandler = { _ in
                         let data = outputPipe.fileHandleForReading.readDataToEndOfFile()
-                        let urlString = String(data: data, encoding: .utf8)?
-                            .trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
-                        guard !urlString.isEmpty, let streamURL = URL(string: urlString) else {
-                            continuation.resume(throwing: YTDLPError.extractionFailed("No URL in output"))
-                            return
-                        }
-                        continuation.resume(returning: streamURL)
+                        continuation.resume(returning: String(data: data, encoding: .utf8) ?? "")
                     }
                 }
             }
-        )
+
+            group.addTask {
+                try await Task.sleep(for: .seconds(processTimeout))
+                task.terminate()
+                return nil
+            }
+
+            for try await value in group {
+                group.cancelAll()
+                if let value { return value }
+                throw YTDLPError.extractionFailed("Timeout after \(Int(processTimeout))s")
+            }
+            throw YTDLPError.extractionFailed("Unexpected")
+        }
+
+        guard task.terminationStatus == 0 else {
+            let errorData = errorPipe.fileHandleForReading.readDataToEndOfFile()
+            let msg = String(data: errorData, encoding: .utf8) ?? "Unknown error"
+            throw YTDLPError.extractionFailed(msg)
+        }
+
+        let urlString = result.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !urlString.isEmpty, let streamURL = URL(string: urlString) else {
+            throw YTDLPError.extractionFailed("No URL in output")
+        }
+        return streamURL
     }
 
     private static func runRaw(args: [String], timeout: TimeInterval? = nil) async throws -> String {
@@ -200,46 +207,36 @@ struct YTDLP {
 
         try task.run()
 
-        return try await withTaskCancellationHandler(
-            handler: { task.terminate() },
-            operation: {
+        let result: String = try await withThrowingTaskGroup(of: String?.self) { group in
+            group.addTask {
                 try await withCheckedThrowingContinuation { continuation in
-                    queue.async {
-                        let timedOut = waitWithTimeout(task, timeout: t)
-                        if timedOut {
-                            continuation.resume(throwing: YTDLPError.extractionFailed("Timeout after \(Int(t))s"))
-                            return
-                        }
-                        guard task.terminationStatus == 0 else {
-                            let errorData = errorPipe.fileHandleForReading.readDataToEndOfFile()
-                            let msg = String(data: errorData, encoding: .utf8) ?? "Unknown error"
-                            continuation.resume(throwing: YTDLPError.extractionFailed(msg))
-                            return
-                        }
+                    task.terminationHandler = { _ in
                         let data = outputPipe.fileHandleForReading.readDataToEndOfFile()
                         continuation.resume(returning: String(data: data, encoding: .utf8) ?? "")
                     }
                 }
             }
-        )
-    }
 
-    private static func waitWithTimeout(_ task: Process, timeout: TimeInterval) -> Bool {
-        let semaphore = DispatchSemaphore(value: 0)
-        var timedOut = false
-        let timer = DispatchSource.makeTimerSource()
-        timer.schedule(deadline: .now() + timeout)
-        timer.setEventHandler {
-            timedOut = true
-            task.terminate()
-            semaphore.signal()
+            group.addTask {
+                try await Task.sleep(for: .seconds(t))
+                task.terminate()
+                return nil
+            }
+
+            for try await value in group {
+                group.cancelAll()
+                if let value { return value }
+                throw YTDLPError.extractionFailed("Timeout after \(Int(t))s")
+            }
+            throw YTDLPError.extractionFailed("Unexpected")
         }
-        task.terminationHandler = { _ in
-            timer.cancel()
-            semaphore.signal()
+
+        guard task.terminationStatus == 0 else {
+            let errorData = errorPipe.fileHandleForReading.readDataToEndOfFile()
+            let msg = String(data: errorData, encoding: .utf8) ?? "Unknown error"
+            throw YTDLPError.extractionFailed(msg)
         }
-        timer.activate()
-        semaphore.wait()
-        return timedOut
+
+        return result
     }
 }

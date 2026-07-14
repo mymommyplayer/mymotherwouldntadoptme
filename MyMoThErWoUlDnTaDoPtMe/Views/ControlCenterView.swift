@@ -1,5 +1,6 @@
 import SwiftUI
 import CoreData
+import UniformTypeIdentifiers
 
 enum SearchFilter: String, CaseIterable {
     case artists = "Artists"
@@ -33,6 +34,7 @@ struct ControlCenterView: View {
     @ObservedObject var queueManager: QueueManager
     @ObservedObject var audioPlayer: AudioPlayer
     @ObservedObject var favoritesManager: FavoritesManager
+    var searchHistoryManager: SearchHistoryManager?
     var onPlay: ((SearchResult) -> Void)?
     var playlistImportService: PlaylistImportService?
     var playlistService: PlaylistService?
@@ -73,10 +75,14 @@ struct ControlCenterView: View {
         }
         .onChange(of: focusSearch) { _, newValue in
             if newValue {
-                isSearchActive = true
                 searchFocused = true
                 showSettingsContent = false
                 focusSearch = false
+            }
+        }
+        .onChange(of: searchViewModel.query) { _, query in
+            if !query.isEmpty {
+                isSearchActive = true
             }
         }
         .onChange(of: isControlCenterOpen) { _, open in
@@ -122,7 +128,8 @@ struct ControlCenterView: View {
         ) { result in
             switch result {
             case .success(let url):
-                editingPlaylist?.backgroundPath = url.path
+                let copiedPath = PlaylistService.copyToContainer(url)
+                editingPlaylist?.backgroundPath = copiedPath ?? url.path
                 PersistenceController.saveWithAlert(context: viewContext)
                 if let playlist = editingPlaylist, playlist == selectedPlaylist {
                     selectedPlaylist = playlist
@@ -142,21 +149,50 @@ struct ControlCenterView: View {
     // MARK: - Header
 
     private var headerBar: some View {
-        HStack(spacing: Spacing.medium) {
-            SearchField(text: $searchViewModel.query, placeholder: "Search YouTube, SoundCloud\u{2026}", onCommit: {
-                if isSearchActive, let first = searchViewModel.homeResults.first {
-                    onPlay?(first)
-                } else {
-                    isSearchActive = true
-                    searchViewModel.search()
+        VStack(spacing: 0) {
+            HStack(spacing: Spacing.medium) {
+                SearchField(text: $searchViewModel.query, placeholder: "Search YouTube, SoundCloud\u{2026}", onCommit: {
+                    if isSearchActive, let first = searchViewModel.homeResults.first {
+                        onPlay?(first)
+                    } else {
+                        isSearchActive = true
+                        searchViewModel.search()
+                        if let manager = searchHistoryManager {
+                            manager.add(searchViewModel.query)
+                        }
+                    }
+                }, isFocused: $searchFocused)
+                    .font(AppFont.body)
+                    .foregroundColor(.glassForeground)
+                    .padding(.horizontal, Spacing.medium)
+                    .frame(height: 32)
+                    .background(.white.opacity(0.1))
+                    .cornerRadius(Radius.button)
+            }
+
+            if searchFocused, searchViewModel.query.isEmpty, let manager = searchHistoryManager, !manager.recentSearches.isEmpty {
+                ScrollView(.horizontal, showsIndicators: false) {
+                    HStack(spacing: Spacing.tight) {
+                        ForEach(manager.recentSearches.prefix(8), id: \.self) { query in
+                            Button {
+                                searchViewModel.query = query
+                                searchViewModel.search()
+                                manager.add(query)
+                            } label: {
+                                Text(query)
+                                    .font(AppFont.small)
+                                    .foregroundColor(.glassForegroundSecondary)
+                                    .padding(.horizontal, 8)
+                                    .padding(.vertical, 4)
+                                    .background(.white.opacity(0.08))
+                                    .clipShape(RoundedRectangle(cornerRadius: 4))
+                            }
+                            .buttonStyle(.plain)
+                        }
+                    }
+                    .padding(.top, Spacing.tight)
                 }
-            }, isFocused: $searchFocused)
-                .font(AppFont.body)
-                .foregroundColor(.glassForeground)
-                .padding(.horizontal, Spacing.medium)
-                .frame(height: 32)
-                .background(.white.opacity(0.1))
-                .cornerRadius(Radius.button)
+            }
         }
         .padding(.horizontal, Spacing.wide)
         .padding(.vertical, Spacing.tight)
@@ -375,6 +411,9 @@ struct ControlCenterView: View {
             }
             if !playlist.tracksArray.isEmpty {
                 Button("Add to Queue") { addPlaylistToQueue(playlist) }
+                Divider()
+                Button("Export as JSON") { exportPlaylist(playlist, format: .json) }
+                Button("Export as M3U") { exportPlaylist(playlist, format: .m3u) }
             }
             Divider()
             Button("Delete", role: .destructive) { confirmDeletePlaylist = playlist }
@@ -720,17 +759,26 @@ struct ControlCenterView: View {
 
     private func addPlaylistToQueue(_ playlist: PlaylistEntity) {
         for track in playlist.tracksArray {
-            let url = track.thumbnailURL.flatMap(URL.init)
-            let result = SearchResult(
-                id: track.trackID,
-                title: track.title,
-                artist: track.artist,
-                duration: track.duration,
-                source: SearchResult.SourceType(rawValue: track.source) ?? .youtube,
-                thumbnailURL: url,
-                streamURL: nil
-            )
+            let result = SearchResult.from(entity: track)
             queueManager.add(QueueItem(id: result.id, track: result, source: result.source.rawValue))
+        }
+    }
+
+    private enum ExportFormat {
+        case json, m3u
+    }
+
+    private func exportPlaylist(_ playlist: PlaylistEntity, format: ExportFormat) {
+        let panel = NSSavePanel()
+        panel.nameFieldStringValue = "\(playlist.name).\(format == .json ? "json" : "m3u")"
+        panel.allowedContentTypes = format == .json ? [.json] : [.plainText]
+        panel.begin { response in
+            guard response == .OK, let url = panel.url else { return }
+            let service = playlistService ?? PlaylistService(context: viewContext)
+            let data: Data? = format == .json ? service.exportAsJSON(playlist) : service.exportAsM3U(playlist).data(using: .utf8)
+            if let data {
+                try? data.write(to: url)
+            }
         }
     }
 

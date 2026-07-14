@@ -154,14 +154,15 @@ struct PlaylistTrackListView: View {
         ) { result in
             switch result {
             case .success(let url):
+                let copiedPath = PlaylistService.copyToContainer(url)
                 if let service = playlistService {
-                    try? service.updateBackground(playlist, path: url.path)
+                    try? service.updateBackground(playlist, path: copiedPath ?? url.path)
                 } else {
-                    playlist.backgroundPath = url.path
+                    playlist.backgroundPath = copiedPath ?? url.path
                     PersistenceController.saveWithAlert(context: viewContext)
                 }
             case .failure(let error):
-                print("File picker error: \(error)")
+                break
             }
         }
         .sheet(isPresented: $showEditSheet) {
@@ -223,18 +224,7 @@ struct PlaylistTrackListView: View {
     }
 
     private func allAsSearchResults() -> [SearchResult] {
-        tracks.map { track in
-            let url = track.thumbnailURL.flatMap(URL.init)
-            return SearchResult(
-                id: track.trackID,
-                title: track.title,
-                artist: track.artist,
-                duration: track.duration,
-                source: SearchResult.SourceType(rawValue: track.source) ?? .youtube,
-                thumbnailURL: url,
-                streamURL: nil
-            )
-        }
+        tracks.map { SearchResult.from(entity: $0) }
     }
 
     private func playAll() {
@@ -254,16 +244,7 @@ struct PlaylistTrackListView: View {
     }
 
     private func searchResult(from entity: PlaylistTrackEntity) -> SearchResult {
-        let url = entity.thumbnailURL.flatMap(URL.init)
-        return SearchResult(
-            id: entity.trackID,
-            title: entity.title,
-            artist: entity.artist,
-            duration: entity.duration,
-            source: SearchResult.SourceType(rawValue: entity.source) ?? .youtube,
-            thumbnailURL: url,
-            streamURL: nil
-        )
+        SearchResult.from(entity: entity)
     }
 }
 

@@ -13,6 +13,8 @@ class AppContainer: ObservableObject {
     let persistenceController: PersistenceController
     let searchViewModel: SearchViewModel
     let favoritesManager: FavoritesManager
+    let searchHistoryManager: SearchHistoryManager
+    let sleepTimerManager: SleepTimerManager
     let nowPlayingManager: NowPlayingManager
     let playlistImportService: PlaylistImportService
     let playlistService: PlaylistService
@@ -29,6 +31,8 @@ class AppContainer: ObservableObject {
         self.persistenceController = PersistenceController.shared
         self.searchViewModel = SearchViewModel()
         self.favoritesManager = FavoritesManager()
+        self.searchHistoryManager = SearchHistoryManager()
+        self.sleepTimerManager = SleepTimerManager()
         self.nowPlayingManager = NowPlayingManager()
         self.playlistImportService = PlaylistImportService(networkClient: .shared)
         self.playlistService = PlaylistService(context: persistenceController.container.viewContext)

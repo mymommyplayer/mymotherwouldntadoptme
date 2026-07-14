@@ -9,6 +9,25 @@ class PlaylistService {
         self.context = context
     }
 
+    static func copyToContainer(_ sourceURL: URL) -> String? {
+        let containerURL = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask).first!
+        let backgroundsDir = containerURL.appendingPathComponent("PlaylistBackgrounds")
+        if !FileManager.default.fileExists(atPath: backgroundsDir.path) {
+            try? FileManager.default.createDirectory(at: backgroundsDir, withIntermediateDirectories: true)
+        }
+        let filename = UUID().uuidString + "." + sourceURL.pathExtension
+        let destURL = backgroundsDir.appendingPathComponent(filename)
+        do {
+            if FileManager.default.fileExists(atPath: destURL.path) {
+                try FileManager.default.removeItem(at: destURL)
+            }
+            try FileManager.default.copyItem(at: sourceURL, to: destURL)
+            return destURL.path
+        } catch {
+            return nil
+        }
+    }
+
     func create(name: String, backgroundPath: String? = nil) throws -> PlaylistEntity {
         let playlist = PlaylistEntity(context: context)
         playlist.id = UUID()
@@ -87,5 +106,40 @@ class PlaylistService {
                 streamURL: nil
             )
         }
+    }
+
+    func exportAsJSON(_ playlist: PlaylistEntity) -> Data? {
+        let tracks = playlist.tracksArray.map { entity in
+            [
+                "id": entity.trackID,
+                "title": entity.title,
+                "artist": entity.artist,
+                "duration": entity.duration,
+                "source": entity.source,
+                "thumbnailURL": entity.thumbnailURL ?? ""
+            ] as [String: Any]
+        }
+        let dict: [String: Any] = [
+            "name": playlist.name,
+            "tracks": tracks
+        ]
+        return try? JSONSerialization.data(withJSONObject: dict, options: .prettyPrinted)
+    }
+
+    func exportAsM3U(_ playlist: PlaylistEntity) -> String {
+        var lines = ["#EXTM3U", "#PLAYLIST:\(playlist.name)"]
+        for track in playlist.tracksArray {
+            let duration = Int(track.duration)
+            lines.append("#EXTINF:\(duration),\(track.artist) - \(track.title)")
+            if let source = SearchResult.SourceType(rawValue: track.source) {
+                switch source {
+                case .youtube:
+                    lines.append("https://www.youtube.com/watch?v=\(track.trackID)")
+                case .soundcloud:
+                    lines.append("https://soundcloud.com/\(track.trackID)")
+                }
+            }
+        }
+        return lines.joined(separator: "\n")
     }
 }

@@ -69,30 +69,12 @@ struct QueuePanelView: View {
                 if let tracks = try? JSONDecoder().decode([DraggedTrack].self, from: data) {
                     Task { @MainActor in
                         for dragged in tracks {
-                            let url = dragged.thumbnailURL.flatMap(URL.init)
-                            let track = SearchResult(
-                                id: dragged.trackID,
-                                title: dragged.title,
-                                artist: dragged.artist,
-                                duration: dragged.duration,
-                                source: SearchResult.SourceType(rawValue: dragged.source) ?? .youtube,
-                                thumbnailURL: url,
-                                streamURL: nil
-                            )
+                            let track = SearchResult.from(dragged: dragged)
                             queueManager.add(QueueItem(id: dragged.trackID, track: track, source: dragged.source))
                         }
                     }
                 } else if let dragged = try? JSONDecoder().decode(DraggedTrack.self, from: data) {
-                    let url = dragged.thumbnailURL.flatMap(URL.init)
-                    let track = SearchResult(
-                        id: dragged.trackID,
-                        title: dragged.title,
-                        artist: dragged.artist,
-                        duration: dragged.duration,
-                        source: SearchResult.SourceType(rawValue: dragged.source) ?? .youtube,
-                        thumbnailURL: url,
-                        streamURL: nil
-                    )
+                    let track = SearchResult.from(dragged: dragged)
                     Task { @MainActor in
                         queueManager.add(QueueItem(id: dragged.trackID, track: track, source: dragged.source))
                     }
@@ -108,13 +90,25 @@ struct QueuePanelView: View {
 
     private func queueItemRow(index: Int, item: QueueItem) -> some View {
         HStack(spacing: Spacing.tight) {
-            ArtworkView(url: item.track.thumbnailURL, size: 28)
-                .frame(width: 28, height: 28)
+            Image(systemName: "line.3.horizontal")
+                .font(AppFont.small)
+                .foregroundColor(.glassForegroundTertiary.opacity(0.5))
+                .frame(width: 12)
+
+            if item.state == .error {
+                Image(systemName: "exclamationmark.triangle.fill")
+                    .font(AppFont.smallIcon)
+                    .foregroundColor(.red)
+                    .frame(width: 28, height: 28)
+            } else {
+                ArtworkView(url: item.track.thumbnailURL, size: 28)
+                    .frame(width: 28, height: 28)
+            }
 
             VStack(alignment: .leading, spacing: 1) {
                 Text(item.track.title)
                     .font(AppFont.body)
-                    .foregroundColor(index == queueManager.currentIndex ? .accentGlass : .glassForeground)
+                    .foregroundColor(index == queueManager.currentIndex ? .accentGlass : (item.state == .error ? .red.opacity(0.8) : .glassForeground))
                     .lineLimit(1)
                     .truncationMode(.tail)
                 Text(item.track.artist)

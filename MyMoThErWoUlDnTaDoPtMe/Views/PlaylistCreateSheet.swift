@@ -190,16 +190,18 @@ struct PlaylistCreateSheet: View {
         let trimmed = name.trimmingCharacters(in: .whitespaces)
         guard !trimmed.isEmpty else { return }
 
+        let backgroundPath = backgroundURL.flatMap { PlaylistService.copyToContainer($0) } ?? backgroundURL?.path
+
         do {
             let playlist: PlaylistEntity
             if let service = playlistService {
-                playlist = try service.create(name: trimmed, backgroundPath: backgroundURL?.path)
+                playlist = try service.create(name: trimmed, backgroundPath: backgroundPath)
             } else {
                 let p = PlaylistEntity(context: viewContext)
                 p.id = UUID()
                 p.name = trimmed
                 p.createdAt = Date()
-                p.backgroundPath = backgroundURL?.path
+                p.backgroundPath = backgroundPath
                 try viewContext.save()
                 playlist = p
             }

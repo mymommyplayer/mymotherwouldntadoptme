@@ -180,8 +180,7 @@ class DiscoveryManager: ObservableObject {
             }
 
             guard let finalCandidate = candidate else {
-                log.warning("no candidate found after all strategies for '\(track.title)', silently skipping")
-                lastError = nil
+                log.warning("no candidate found after all strategies for '\(track.title)'")
                 return
             }
 
@@ -193,15 +192,13 @@ class DiscoveryManager: ObservableObject {
                 results = try await searchTrack(query)
             } catch {
                 log.warning("search failed for '\(query)': \(error.localizedDescription)")
-                lastError = nil
                 return
             }
 
             guard !Task.isCancelled else { log.debug("cancelled after search"); return }
 
             guard !results.isEmpty else {
-                log.warning("search returned no results for '\(query)', silently skipping")
-                lastError = nil
+                log.warning("search returned no results for '\(query)'")
                 return
             }
 
@@ -220,8 +217,7 @@ class DiscoveryManager: ObservableObject {
             }
 
             guard let resolved, let url = streamURL else {
-                log.warning("all resolve attempts failed for '\(query)', silently skipping")
-                lastError = nil
+                log.warning("all resolve attempts failed for '\(query)'")
                 return
             }
 
